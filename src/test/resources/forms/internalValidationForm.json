@@ -1,0 +1,40 @@
+{
+  "components": [
+    {
+      "id": "email",
+      "type": "textfield",
+      "label": "Email",
+      "validate": {
+        "custom": {
+          "internal": {
+            "required": true,
+            "minLength": 5,
+            "maxLength": 25,
+            "pattern": ".+\\@.+\\..+"
+          }
+        },
+        "required": true,
+        "minLength": 5,
+        "maxLength": 25,
+        "pattern": ".+\\@.+\\..+"
+      }
+    },
+    {
+      "id": "birthdate",
+      "type": "datetime",
+      "validate": {
+        "minDate": "2018-12-03T22:38:29.042Z",
+        "custom": {
+          "internal": {
+            "minDate": "2018-12-03T22:38:29.042Z",
+            "jsonata": "$toMillis(birthdate) > $toMillis(\"@date:now@\")"
+          },
+          "external": {
+            "jsonata": "$toMillis(birthdate) > $toMillis(\"@date:now@\")"
+          }
+        }
+      }
+    }
+  ]
+}
+

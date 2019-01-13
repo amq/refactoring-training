@@ -1,0 +1,45 @@
+{
+  "components": [
+    {
+      "id": "beteiligtePersonen",
+      "type": "grid",
+      "label": "Beteiligte Personen",
+      "components": [
+        {
+          "id": "vorname",
+          "type": "textfield",
+          "label": "vorname"
+        },
+        {
+          "id": "nachname",
+          "type": "textfield",
+          "label": "nachname",
+          "validate": {
+            "custom": "$not($boolean(beteiligtePersonen[@eval:rownum@].vorname) and $boolean(beteiligtePersonen[@eval:rownum@].nachname))"
+          }
+        }
+      ]
+    },
+    {
+      "id": "weitereBeteiligtePersonen",
+      "type": "grid",
+      "label": "Weitere beteiligte Personen",
+      "components": [
+        {
+          "id": "vorname",
+          "type": "textfield",
+          "label": "vorname"
+        },
+        {
+          "id": "nachname",
+          "type": "textfield",
+          "label": "nachname"
+        }
+      ],
+      "validate": {
+        "minLength": 1
+      }
+    }
+  ]
+}
+

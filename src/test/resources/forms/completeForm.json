@@ -1,0 +1,62 @@
+{
+  "components": [
+    {
+      "id": "firstName",
+      "type": "textfield",
+      "label": "Vorname",
+      "validate": {
+        "required": true,
+        "minLength": 5,
+        "maxLength": 25
+      }
+    },
+    {
+      "id": "lastName",
+      "type": "textfield",
+      "label": "Nachname",
+      "validate": {
+        "required": true,
+        "minLength": 5,
+        "maxLength": 25
+      }
+    },
+    {
+      "id": "email",
+      "type": "textfield",
+      "label": "Email",
+      "validate": {
+        "pattern": ".+\\@.+\\..+"
+      }
+    },
+    {
+      "id": "birthdate",
+      "type": "datetime",
+      "validate": {
+        "minDate": "2018-12-03T22:38:29.042Z",
+        "custom": "$toMillis(birthdate) > $toMillis(\"@date:now@\")"
+      }
+    },
+    {
+      "id": "address",
+      "type": "panel",
+      "label": "Adresse",
+      "components": [
+        {
+          "id": "street",
+          "type": "textfield",
+          "validate": {
+            "required": true
+          }
+        },
+        {
+          "id": "number",
+          "type": "number",
+          "validate": {
+            "required": true
+          }
+        }
+      ]
+    }
+  ]
+}
+
