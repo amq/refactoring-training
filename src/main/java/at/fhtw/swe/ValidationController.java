@@ -5,14 +5,15 @@ import at.fhtw.swe.service.Validator;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.beans.Transient;
 import java.util.Set;
 
 @RestController
 public class ValidationController {
 
-    private Validator validator;
+    private final transient Validator validator;
 
-    public ValidationController(Validator validator) {
+    public ValidationController(final Validator validator) {
         this.validator = validator;
     }
 
@@ -22,15 +23,15 @@ public class ValidationController {
     }
 
     @PostMapping("/internal")
-    public ResponseEntity<Set<ValidationError>> postInternalValidation(@RequestBody() ValidationRequestBody body) {
-        Set<ValidationError> validationErrors = this.validator.validateForm(body.getTemplate(), body.getData(), true);
+    public ResponseEntity<Set<ValidationError>> postInternalValidation(final @RequestBody() ValidationRequestBody body) {
+        final Set<ValidationError> validationErrors = this.validator.validateForm(body.getTemplate(), body.getData(), true);
         return ResponseEntity.ok(validationErrors);
     }
 
 
     @PostMapping("/external")
-    public ResponseEntity<Set<ValidationError>> postExternalValidation(@RequestBody() ValidationRequestBody body) {
-        Set<ValidationError> validationErrors = this.validator.validateForm(body.getTemplate(), body.getData(), false);
+    public ResponseEntity<Set<ValidationError>> postExternalValidation(final @RequestBody() ValidationRequestBody body) {
+        final Set<ValidationError> validationErrors = this.validator.validateForm(body.getTemplate(), body.getData(), false);
         return ResponseEntity.ok(validationErrors);
     }
 }

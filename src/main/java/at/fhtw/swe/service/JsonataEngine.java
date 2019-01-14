@@ -21,8 +21,8 @@ public class JsonataEngine {
 
     private static final Logger LOG = LoggerFactory.getLogger(JsonataEngine.class);
 
-    private ScriptEngine engine;
-    private Invocable inv;
+    private final transient ScriptEngine engine;
+    private final transient Invocable inv;
 
     public JsonataEngine() {
         final ScriptEngineManager factory = new ScriptEngineManager();
@@ -42,7 +42,7 @@ public class JsonataEngine {
         }
     }
 
-    public Object parseData(String data) {
+    public Object parseData(final String data) {
         engine.put("input", data);
         try {
             return engine.eval("JSON.parse(input);");
@@ -51,7 +51,7 @@ public class JsonataEngine {
         }
     }
 
-    public String validate(Object data, String jsonataExpression) {
+    public String validate(final Object data, final String jsonataExpression) {
 
         Object resultjson = null;
         try {

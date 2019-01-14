@@ -4,6 +4,7 @@ import static com.jayway.jsonpath.Criteria.where;
 import static com.jayway.jsonpath.Filter.filter;
 
 import at.fhtw.swe.model.ValidationError;
+import at.fhtw.swe.model.ValidationValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.jayway.jsonpath.Configuration;
@@ -64,11 +65,11 @@ public class Validator {
             DATE_MIN_CHECK = (value, dateMinVal) -> value.isAfter(dateMinVal),
             DATE_MAX_CHECK = (value, dateMaxVal) -> value.isBefore(dateMaxVal);
 
-    private JsonataEngine jsonataEngine;
-    private JsonPath getInputsToValidate = JsonPath.compile(INPUTS_TO_VALIDATE_QUERY, filter(where("@." + VALIDATE_KEY).exists(true)));
-    private JsonPath getInputKeysInsideGrids = JsonPath.compile(GRID_INPUT_KEYS_QUERY, filter(where("@." + TYPE_KEY).eq(TYPE_GRID)), filter(where("@." + VALIDATE_KEY).exists(true)));
+    private final transient JsonataEngine jsonataEngine;
+    private final transient JsonPath getInputsToValidate = JsonPath.compile(INPUTS_TO_VALIDATE_QUERY, filter(where("@." + VALIDATE_KEY).exists(true)));
+    private final transient JsonPath getInputKeysInsideGrids = JsonPath.compile(GRID_INPUT_KEYS_QUERY, filter(where("@." + TYPE_KEY).eq(TYPE_GRID)), filter(where("@." + VALIDATE_KEY).exists(true)));
 
-    public Validator(JsonataEngine jsonataEngine) {
+    public Validator(final JsonataEngine jsonataEngine) {
         this.jsonataEngine = jsonataEngine;
 
         Configuration.setDefaults(
@@ -95,7 +96,7 @@ public class Validator {
     }
 
     public Set<ValidationError> validateForm(
-            String form, String formdata, boolean internal) {
+            final String form, final String formdata, final boolean internal) {
         final DocumentContext formContext = JsonPath.parse(form);
         final DocumentContext dataContext = JsonPath.parse(formdata);
 
@@ -106,25 +107,34 @@ public class Validator {
 
         inputsWithValidations.forEach(
                 input -> {
-                    final JsonNode validationNode = input.get(VALIDATE_KEY);
+                    ValidationValue validationValue = new ValidationValue();
+
                     final String id = input.get(COMPONENT_KEY).asText();
                     final ArrayNode inspectedValue = dataContext.read("$.." + id, ArrayNode.class);
-                    final String type = input.get(TYPE_KEY).asText();
+
+                    validationValue.setInstruction(input.get(VALIDATE_KEY));
+                    validationValue.setKey(id);
+                    validationValue.setType(input.get(TYPE_KEY).asText());
+                    validationValue.setInternal(internal);
 
                     if (gridInputs.contains(id)) {
                         // grid validation
                         for (int row = 0; row < inspectedValue.size(); row++) {
+                            validationValue.setValue(inspectedValue.get(row));
+                            validationValue.setRow(row);
                             errors.addAll(
-                                    validateSingleValue(inspectedValue.get(row), validationNode, id, type, row, internal));
-                            checkJsonnata(jsonataData, validationNode, id, row, internal)
+                                    validateSingleValue(validationValue));
+                            checkJsonnata(jsonataData, validationValue)
                                     .ifPresent(error -> errors.add(error));
                         }
 
                     } else {
                         // normal validation
+                        validationValue.setValue(inspectedValue.get(0));
+                        validationValue.setRow(null);
                         errors.addAll(
-                                validateSingleValue(inspectedValue.get(0), validationNode, id, type, null, internal));
-                        checkJsonnata(jsonataData, validationNode, id, null, internal)
+                                validateSingleValue(validationValue));
+                        checkJsonnata(jsonataData, validationValue)
                                 .ifPresent(error -> errors.add(error));
                     }
                 });
@@ -132,192 +142,152 @@ public class Validator {
         return errors;
     }
 
-    private ArrayNode getInputsWithValidations(DocumentContext formContext) {
+    private ArrayNode getInputsWithValidations(final DocumentContext formContext) {
         return formContext.read(getInputsToValidate, ArrayNode.class);
     }
 
-    private Set<String> getInputKeysInsideGrids(DocumentContext formContext) {
+    private Set<String> getInputKeysInsideGrids(final DocumentContext formContext) {
         return formContext.read(getInputKeysInsideGrids, Set.class);
     }
 
     private Set<ValidationError> validateSingleValue(
-            JsonNode valueToInspect,
-            JsonNode instruction,
-            String inputKey,
-            String inputType,
-            Integer row,
-            boolean internal) {
+            final ValidationValue validationValue) {
         final Set<ValidationError> result = new HashSet<>();
         final Consumer<ValidationError> storeError = error -> result.add(error);
 
-        validateRequired(valueToInspect, instruction, inputKey, row, internal)
+        validateRequired(validationValue)
                 .ifPresent(storeError);
 
-        if (TYPE_GRID.equals(inputType)) {
-            validateMinRowCount(valueToInspect, instruction, inputKey, row)
+        if (TYPE_GRID.equals(validationValue.getType())) {
+            validateMinRowCount(validationValue)
                     .ifPresent(storeError);
-            validateMaxRowCount(valueToInspect, instruction, inputKey, row)
+            validateMaxRowCount(validationValue)
                     .ifPresent(storeError);
-        } else if (TYPE_DATETIME.equals(inputType)) {
-            validateDateMin(valueToInspect, instruction, inputKey, row, internal)
+        } else if (TYPE_DATETIME.equals(validationValue.getType())) {
+            validateDateMin(validationValue)
                     .ifPresent(storeError);
-            validateDateMax(valueToInspect, instruction, inputKey, row, internal)
+            validateDateMax(validationValue)
                     .ifPresent(storeError);
         } else {
-            validateMinLength(valueToInspect, instruction, inputKey, row, internal)
+            validateMinLength(validationValue)
                     .ifPresent(storeError);
-            validateMaxLength(valueToInspect, instruction, inputKey, row, internal)
+            validateMaxLength(validationValue)
                     .ifPresent(storeError);
         }
-        validatePattern(valueToInspect, instruction, inputKey, row, internal)
+        validatePattern(validationValue)
                 .ifPresent(storeError);
-        validateMin(valueToInspect, instruction, inputKey, row, internal)
+        validateMin(validationValue)
                 .ifPresent(storeError);
-        validateMax(valueToInspect, instruction, inputKey, row, internal)
+        validateMax(validationValue)
                 .ifPresent(storeError);
 
         return result;
     }
 
     private Optional<ValidationError> validateRequired(
-            JsonNode value,
-            JsonNode validationInstruction,
-            String key,
-            Integer row,
-            boolean internal) {
-        if (extractValidationInstruction(validationInstruction, REQUIRED_KEY, internal)
+            final ValidationValue validationValue) {
+        if (extractValidationInstruction(validationValue.getInstruction(), REQUIRED_KEY, validationValue.isInternal())
                 .map(JsonNode::asBoolean)
                 .orElse(false)) {
 
-            if (value == null) {
-                return Optional.ofNullable(cfeateError(key, row, REQUIRED_KEY));
+            if (validationValue.getValue() == null) {
+                return Optional.ofNullable(cfeateError(validationValue.getKey(), validationValue.getRow(), REQUIRED_KEY));
             }
-            return Optional.ofNullable(value)
+            return Optional.ofNullable(validationValue.getValue())
                     .map(JsonNode::asText)
                     .map(valueString -> !valueString.isEmpty())
-                    .map(valid -> valid ? null : cfeateError(key, row, REQUIRED_KEY));
+                    .map(valid -> valid ? null : cfeateError(validationValue.getKey(), validationValue.getRow(), REQUIRED_KEY));
         }
 
         return Optional.empty();
     }
 
     private Optional<ValidationError> validateDateMin(
-            JsonNode value,
-            JsonNode datePickerInstruction,
-            String key,
-            Integer row,
-            boolean internal) {
+            final ValidationValue validationValue) {
         return validateDateTime(
-                value, datePickerInstruction, key, row, DATE_MIN_KEY, internal, DATE_MIN_CHECK);
+                validationValue, DATE_MIN_KEY, DATE_MIN_CHECK);
     }
 
     private Optional<ValidationError> validateDateMax(
-            JsonNode value,
-            JsonNode datePickerInstruction,
-            String key,
-            Integer row,
-            boolean internal) {
+            final ValidationValue validationValue) {
         return validateDateTime(
-                value, datePickerInstruction, key, row, DATE_MAX_KEY, internal, DATE_MAX_CHECK);
+                validationValue, DATE_MAX_KEY, DATE_MAX_CHECK);
     }
 
     private Optional<ValidationError> validateMinLength(
-            JsonNode value,
-            JsonNode validationInstruction,
-            String key,
-            Integer row,
-            boolean internal) {
+            final ValidationValue validationValue) {
         return validateLength(
-                value, validationInstruction, key, row, MIN_LENGTH_KEY, internal, MIN_LENGTH_CHECK);
+                validationValue, MIN_LENGTH_KEY, MIN_LENGTH_CHECK);
     }
 
     private Optional<ValidationError> validateMaxLength(
-            JsonNode value,
-            JsonNode validationInstruction,
-            String key,
-            Integer row,
-            boolean internal) {
+            final ValidationValue validationValue) {
         return validateLength(
-                value, validationInstruction, key, row, MAX_LENGTH_KEY, internal, MAX_LENGTH_CHECK);
+                validationValue, MAX_LENGTH_KEY, MAX_LENGTH_CHECK);
     }
 
     private Optional<ValidationError> validateMin(
-            JsonNode value,
-            JsonNode validationInstruction,
-            String key,
-            Integer row,
-            boolean internal) {
-        if (validationInstruction.has(MIN_KEY)) {
+            final ValidationValue validationValue) {
+        if (validationValue.getInstruction().has(MIN_KEY)) {
             return validateNumberValue(
-                    value, validationInstruction, key, row, MIN_KEY, internal, MIN_CHECK);
+                    validationValue, MIN_KEY, MIN_CHECK);
         }
         return Optional.empty();
     }
 
     private Optional<ValidationError> validateMax(
-            JsonNode value,
-            JsonNode validationInstruction,
-            String key,
-            Integer row,
-            boolean internal) {
-        if (validationInstruction.has(MAX_KEY)) {
+            final ValidationValue validationValue) {
+        if (validationValue.getInstruction().has(MAX_KEY)) {
             return validateNumberValue(
-                    value, validationInstruction, key, row, MAX_KEY, internal, MAX_CHECK);
+                    validationValue, MAX_KEY, MAX_CHECK);
         }
         return Optional.empty();
     }
 
     private Optional<ValidationError> validateMinRowCount(
-            JsonNode value, JsonNode validationInstruction, String key, Integer row) {
-        if (validationInstruction.has(MIN_LENGTH_KEY)) {
+            final ValidationValue validationValue) {
+        if (validationValue.getInstruction().has(MIN_LENGTH_KEY)) {
             return validateRowCountValue(
-                    value, validationInstruction, key, row, MIN_LENGTH_KEY, MIN_ROW_COUNT_CHECK);
+                    validationValue, MIN_LENGTH_KEY, MIN_ROW_COUNT_CHECK);
         }
         return Optional.empty();
     }
 
     private Optional<ValidationError> validateMaxRowCount(
-            JsonNode value, JsonNode validationInstruction, String key, Integer row) {
-        if (validationInstruction.has(MAX_LENGTH_KEY)) {
+            final ValidationValue validationValue) {
+        if (validationValue.getInstruction().has(MAX_LENGTH_KEY)) {
             return validateRowCountValue(
-                    value, validationInstruction, key, row, MAX_LENGTH_KEY, MAX_ROW_COUNT_CHECK);
+                    validationValue, MAX_LENGTH_KEY, MAX_ROW_COUNT_CHECK);
         }
         return Optional.empty();
     }
 
     private Optional<ValidationError> validatePattern(
-            JsonNode value,
-            JsonNode validationInstruction,
-            String key,
-            Integer row,
-            boolean internal) {
+            final ValidationValue validationValue) {
         final String regexPattern =
-                extractValidationInstruction(validationInstruction, PATTERN_KEY, internal)
+                extractValidationInstruction(validationValue.getInstruction(), PATTERN_KEY, validationValue.isInternal())
                         .map(JsonNode::asText)
                         .orElse(null);
         if (regexPattern != null) {
-            return Optional.ofNullable(value)
+            return Optional.ofNullable(validationValue.getValue())
                     .map(JsonNode::asText)
                     .map(valueString -> valueString.matches(regexPattern))
-                    .map(valid -> valid ? null : cfeateError(key, row, PATTERN_KEY));
+                    .map(valid -> valid ? null : cfeateError(validationValue.getKey(), validationValue.getRow(), PATTERN_KEY));
         }
 
         return Optional.empty();
     }
 
     private Optional<ValidationError> checkJsonnata(
-            Object jsonataData,
-            JsonNode validationInstruction,
-            String key,
-            Integer row,
-            boolean internal) {
+            final Object jsonataData,
+            final ValidationValue validationValue) {
         final String jsonataPattern =
-                extractValidationInstruction(validationInstruction, JSONATA_KEY, internal)
+                extractValidationInstruction(validationValue.getInstruction(), JSONATA_KEY, validationValue.isInternal())
                         .map(JsonNode::asText)
                         .orElse(null);
         if (jsonataPattern != null) {
             String compiledJsonataPattern =
-                    Optional.ofNullable(row)
+                    Optional.ofNullable(validationValue.getValue())
                             .map(rowInt -> rowInt.toString())
                             .map(rowString -> jsonataPattern.replace(ROW_NUM_PLACEHOLER, rowString))
                             .orElse(jsonataPattern);
@@ -326,96 +296,81 @@ public class Validator {
 
             return Optional.ofNullable(jsonataEngine.validate(jsonataData, compiledJsonataPattern))
                     .map(jsonataResult -> Boolean.parseBoolean(jsonataResult))
-                    .map(valid -> !valid ? cfeateError(key, row, JSONATA_KEY) : null);
+                    .map(valid -> !valid ? cfeateError(validationValue.getKey(), validationValue.getRow(), JSONATA_KEY) : null);
         }
 
         return Optional.empty();
     }
 
     private Optional<ValidationError> validateLength(
-            JsonNode value,
-            JsonNode validationInstruction,
-            String hashKey,
-            Integer row,
-            String validationKey,
-            boolean internal,
-            BiFunction<String, Integer, Boolean> lengthCheck) {
+            final ValidationValue validationValue,
+            final String validationKey,
+            final BiFunction<String, Integer, Boolean> lengthCheck) {
         final Integer length =
-                extractValidationInstruction(validationInstruction, validationKey, internal)
+                extractValidationInstruction(validationValue.getInstruction(), validationKey, validationValue.isInternal())
                         .map(JsonNode::asInt)
                         .orElse(null);
         if (length != null) {
-            return Optional.ofNullable(value)
+            return Optional.ofNullable(validationValue.getValue())
                     .map(JsonNode::asText)
                     .map(valueString -> lengthCheck.apply(valueString, length))
-                    .map(valid -> valid ? null : cfeateError(hashKey, row, validationKey));
+                    .map(valid -> valid ? null : cfeateError(validationValue.getKey(), validationValue.getRow(), validationKey));
         }
         return Optional.empty();
     }
 
     private Optional<ValidationError> validateDateTime(
-            JsonNode value,
-            JsonNode datePickerInstruction,
-            String hashKey,
-            Integer row,
-            String validationKey,
-            boolean internal,
-            BiFunction<Instant, Instant, Boolean> dateCheck) {
+            final ValidationValue validationValue,
+            final String validationKey,
+            final BiFunction<Instant, Instant, Boolean> dateCheck) {
         final String currDate =
-                extractValidationInstruction(datePickerInstruction, validationKey, internal)
+                extractValidationInstruction(validationValue.getInstruction(), validationKey, validationValue.isInternal())
                         .map(JsonNode::asText)
                         .orElse(null);
         if (currDate != null) {
-            return Optional.ofNullable(value)
+            return Optional.ofNullable(validationValue.getValue())
                     .map(JsonNode::asText)
                     .map(valueString -> dateCheck.apply(Instant.parse(valueString), Instant.parse(currDate)))
-                    .map(valid -> valid ? null : cfeateError(hashKey, row, validationKey));
+                    .map(valid -> valid ? null : cfeateError(validationValue.getKey(), validationValue.getRow(), validationKey));
         }
         return Optional.empty();
     }
 
     private Optional<ValidationError> validateNumberValue(
-            JsonNode value,
-            JsonNode validationInstruction,
-            String hashKey,
-            Integer row,
-            String validationKey,
-            boolean internal,
-            BiFunction<Double, Double, Boolean> numberCheck) {
+            final ValidationValue validationValue,
+            final String validationKey,
+            final BiFunction<Double, Double, Boolean> numberCheck) {
         final Double val =
-                extractValidationInstruction(validationInstruction, validationKey, internal)
+                extractValidationInstruction(validationValue.getInstruction(), validationKey, validationValue.isInternal())
                         .map(JsonNode::asDouble)
                         .orElse(null);
-        return Optional.ofNullable(value)
+        return Optional.ofNullable(validationValue.getValue())
                 .map(JsonNode::asDouble)
                 .map(valueNumber -> numberCheck.apply(valueNumber, val))
-                .map(valid -> valid ? null : cfeateError(hashKey, row, validationKey));
+                .map(valid -> valid ? null : cfeateError(validationValue.getKey(), validationValue.getRow(), validationKey));
     }
 
     private Optional<ValidationError> validateRowCountValue(
-            JsonNode value,
-            JsonNode validationInstruction,
-            String hashKey,
-            Integer row,
-            String validationKey,
-            BiFunction<Integer, Integer, Boolean> rowCountCheck) {
+            final ValidationValue validationValue,
+            final String validationKey,
+            final BiFunction<Integer, Integer, Boolean> rowCountCheck) {
         final Integer val =
-                Optional.ofNullable(getExternalValidations(validationInstruction, validationKey))
+                Optional.ofNullable(getExternalValidations(validationValue.getInstruction(), validationKey))
                         .map(JsonNode::asInt)
                         .orElse(null);
-        return Optional.ofNullable(value)
+        return Optional.ofNullable(validationValue.getValue())
                 .map(JsonNode::size)
                 .map(valueNumber -> rowCountCheck.apply(valueNumber, val))
-                .map(valid -> valid ? null : cfeateError(hashKey, row, validationKey));
+                .map(valid -> valid ? null : cfeateError(validationValue.getKey(), validationValue.getRow(), validationKey));
     }
 
-    private ValidationError cfeateError(String key, Integer row, String violation) {
+    private ValidationError cfeateError(final String key, final Integer row, final String violation) {
         final ValidationError error = new ValidationError().key(key).violation(violation);
         return error;
     }
 
     private Optional<JsonNode> extractValidationInstruction(
-            JsonNode validationInstruction, String validationKey, boolean internal) {
+            final JsonNode validationInstruction, final String validationKey, final boolean internal) {
         return internal ? Optional.ofNullable(
                 getInternalValidations(validationInstruction, validationKey))
                 : Optional.ofNullable(
@@ -423,7 +378,7 @@ public class Validator {
     }
 
     private JsonNode getExternalValidations(
-            JsonNode validationInstruction, String validationKey) {
+            final JsonNode validationInstruction, final String validationKey) {
         if (JSONATA_KEY.equals(validationKey)) {
             final JsonNode customTag = validationInstruction.get(CUSTOM_KEY);
             if (customTag == null) {
@@ -444,7 +399,7 @@ public class Validator {
     }
 
     private JsonNode getInternalValidations(
-            JsonNode validationInstruction, String validationKey) {
+            final JsonNode validationInstruction, final String validationKey) {
         return Optional.ofNullable(validationInstruction.get(CUSTOM_KEY))
                 .map(customTag -> customTag.get(INTERNAL_KEY))
                 .map(internalTag -> internalTag.get(validationKey))

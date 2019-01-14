@@ -3,15 +3,15 @@ package at.fhtw.swe.model;
 import java.util.Objects;
 
 public class ValidationError {
-    private String key;
-    private String violation;
+    private transient String key;
+    private transient String violation;
 
-    public ValidationError key(String key) {
+    public ValidationError key(final String key) {
         this.key = key;
         return this;
     }
 
-    public ValidationError violation(String violation) {
+    public ValidationError violation(final String violation) {
         this.violation = violation;
         return this;
     }
@@ -25,10 +25,14 @@ public class ValidationError {
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ValidationError that = (ValidationError) o;
+    public boolean equals(final Object object) {
+        if (this == object) {
+            return true;
+        }
+        if (object == null || getClass() != object.getClass()) {
+            return false;
+        }
+        ValidationError that = (ValidationError) object;
         return Objects.equals(key, that.key) &&
                 Objects.equals(violation, that.violation);
     }

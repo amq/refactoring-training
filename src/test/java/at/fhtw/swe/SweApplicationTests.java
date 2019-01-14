@@ -19,15 +19,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class SweApplicationTests {
 
     @Autowired
-    private ValidationController sut;
+    private transient ValidationController sut;
 
     @Test
     public void basicComponents() {
-        ValidationRequestBody body = new ValidationRequestBody();
+        final ValidationRequestBody body = new ValidationRequestBody();
         body.setTemplate(getTestFileAsString("/forms/completeForm.json"));
         body.setData(getTestFileAsString("/forms/completeData.json"));
 
-        ResponseEntity<Set<ValidationError>> responseEntity = sut.postExternalValidation(body);
+        final ResponseEntity<Set<ValidationError>> responseEntity = sut.postExternalValidation(body);
 
         assertThat(responseEntity.getBody()).containsExactlyInAnyOrder(
                 new ValidationError().key("firstName").violation("minLength"),
@@ -41,11 +41,11 @@ public class SweApplicationTests {
 
     @Test
     public void grid() {
-        ValidationRequestBody body = new ValidationRequestBody();
+        final ValidationRequestBody body = new ValidationRequestBody();
         body.setTemplate(getTestFileAsString("/forms/gridForm.json"));
         body.setData(getTestFileAsString("/forms/gridData.json"));
 
-        ResponseEntity<Set<ValidationError>> responseEntity = sut.postExternalValidation(body);
+        final ResponseEntity<Set<ValidationError>> responseEntity = sut.postExternalValidation(body);
 
         assertThat(responseEntity.getBody()).containsExactlyInAnyOrder(
                 new ValidationError().key("weitereBeteiligtePersonen").violation("minLength"),
@@ -55,14 +55,14 @@ public class SweApplicationTests {
 
     @Test
     public void internalAndExternal() {
-        ValidationRequestBody body = new ValidationRequestBody();
+        final ValidationRequestBody body = new ValidationRequestBody();
         body.setTemplate(getTestFileAsString("/forms/internalValidationForm.json"));
         body.setData(getTestFileAsString("/forms/internalValidationData.json"));
 
-        ResponseEntity<Set<ValidationError>> internalErrors = sut.postInternalValidation(body);
-        ResponseEntity<Set<ValidationError>> externalErrors = sut.postExternalValidation(body);
+        final ResponseEntity<Set<ValidationError>> internalErrors = sut.postInternalValidation(body);
+        final ResponseEntity<Set<ValidationError>> externalErrors = sut.postExternalValidation(body);
 
-        ValidationError[] validationErrors = {
+        final ValidationError[] validationErrors = {
                 new ValidationError().key("email").violation("minLength"),
                 new ValidationError().key("email").violation("pattern"),
                 new ValidationError().key("birthdate").violation("jsonata"),
@@ -73,19 +73,20 @@ public class SweApplicationTests {
         assertThat(internalErrors.getBody()).containsExactlyInAnyOrder(validationErrors);
     }
 
-    public String getTestFileAsString(String testFile) {
+    public String getTestFileAsString(final String testFile) {
         try {
-            InputStreamReader inputStreamReader = new InputStreamReader(
+            final InputStreamReader inputStreamReader = new InputStreamReader(
                     this.getClass().getResourceAsStream(testFile),
                     StandardCharsets.UTF_8.name());
 
-            char[] buffer = new char[4096];
-            StringBuilder sb = new StringBuilder();
-            for (int len; (len = inputStreamReader.read(buffer)) > 0; )
+            final char[] buffer = new char[4096];
+            final StringBuilder sb = new StringBuilder();
+            for (int len; (len = inputStreamReader.read(buffer)) > 0; ) {
                 sb.append(buffer, 0, len);
+            }
             return sb.toString();
         } catch (IOException e) {
-            throw new RuntimeException("error in reading test-file: " + testFile);
+            throw new RuntimeException("error in reading test-file: " + testFile, e);
         }
     }
 

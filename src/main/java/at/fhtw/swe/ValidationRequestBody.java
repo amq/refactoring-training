@@ -8,7 +8,7 @@ public class ValidationRequestBody {
         return data;
     }
 
-    public void setData(String data) {
+    public void setData(final String data) {
         this.data = data;
     }
 
@@ -16,7 +16,7 @@ public class ValidationRequestBody {
         return template;
     }
 
-    public void setTemplate(String template) {
+    public void setTemplate(final String template) {
         this.template = template;
     }
 }
