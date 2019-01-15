@@ -1,7 +1,7 @@
 package at.fhtw.swe;
 
 import at.fhtw.swe.model.ValidationError;
-import at.fhtw.swe.service.Validator;
+import at.fhtw.swe.controller.Validator;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
