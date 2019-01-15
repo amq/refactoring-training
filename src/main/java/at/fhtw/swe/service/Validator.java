@@ -105,39 +105,58 @@ public class Validator {
         final Set<String> gridInputs = getInputKeysInsideGrids(formContext);
         final Set<ValidationError> errors = new HashSet<>();
 
-        inputsWithValidations.forEach(
-                input -> {
-                    ValidationValue validationValue = new ValidationValue();
+        for (JsonNode input : inputsWithValidations) {
+            ValidationValue validationValue = new ValidationValue();
 
-                    final String id = input.get(COMPONENT_KEY).asText();
-                    final ArrayNode inspectedValue = dataContext.read("$.." + id, ArrayNode.class);
+            final String id = input.get(COMPONENT_KEY).asText();
+            final ArrayNode inspectedValue = dataContext.read("$.." + id, ArrayNode.class);
 
-                    validationValue.setInstruction(input.get(VALIDATE_KEY));
-                    validationValue.setKey(id);
-                    validationValue.setType(input.get(TYPE_KEY).asText());
-                    validationValue.setInternal(internal);
+            validationValue.setInstruction(input.get(VALIDATE_KEY));
+            validationValue.setKey(id);
+            validationValue.setType(input.get(TYPE_KEY).asText());
+            validationValue.setInternal(internal);
 
-                    if (gridInputs.contains(id)) {
-                        // grid validation
-                        for (int row = 0; row < inspectedValue.size(); row++) {
-                            validationValue.setValue(inspectedValue.get(row));
-                            validationValue.setRow(row);
-                            errors.addAll(
-                                    validateSingleValue(validationValue));
-                            checkJsonnata(jsonataData, validationValue)
-                                    .ifPresent(error -> errors.add(error));
-                        }
+            if (gridInputs.contains(id)) {
+                errors.addAll(validateFormGrid(jsonataData, validationValue, inspectedValue));
+            } else {
+                errors.addAll(validateFormNormal(jsonataData, validationValue, inspectedValue));
+            }
+        }
 
-                    } else {
-                        // normal validation
-                        validationValue.setValue(inspectedValue.get(0));
-                        validationValue.setRow(null);
-                        errors.addAll(
-                                validateSingleValue(validationValue));
-                        checkJsonnata(jsonataData, validationValue)
-                                .ifPresent(error -> errors.add(error));
-                    }
-                });
+        return errors;
+    }
+
+    private Set<ValidationError> validateFormGrid(
+            Object jsonataData,
+            ValidationValue validationValue,
+            ArrayNode inspectedValue) {
+        Set<ValidationError> errors = new HashSet<>();
+
+        for (int row = 0; row < inspectedValue.size(); row++) {
+            validationValue.setValue(inspectedValue.get(row));
+            validationValue.setRow(row);
+            errors.addAll(
+                    validateSingleValue(validationValue));
+            checkJsonnata(jsonataData, validationValue)
+                    .ifPresent(error -> errors.add(error));
+        }
+
+        return errors;
+    }
+
+    private Set<ValidationError> validateFormNormal(
+            Object jsonataData,
+            ValidationValue validationValue,
+            ArrayNode inspectedValue) {
+
+        Set<ValidationError> errors = new HashSet<>();
+        validationValue.setValue(inspectedValue.get(0));
+        validationValue.setRow(null);
+        
+        errors.addAll(
+                validateSingleValue(validationValue));
+        checkJsonnata(jsonataData, validationValue)
+                .ifPresent(error -> errors.add(error));
 
         return errors;
     }
