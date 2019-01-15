@@ -1,11 +1,10 @@
-package at.fhtw.swe.controller;
+package at.fhtw.swe.service;
 
 import static com.jayway.jsonpath.Criteria.where;
 import static com.jayway.jsonpath.Filter.filter;
 
 import at.fhtw.swe.model.ValidationError;
 import at.fhtw.swe.model.ValidationValue;
-import at.fhtw.swe.service.JsonataEngine;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.jayway.jsonpath.Configuration;
@@ -81,10 +80,9 @@ public class Validator {
         final ArrayNode inputsWithValidations = getInputsWithValidations(formContext);
         final Set<String> gridInputs = getInputKeysInsideGrids(formContext);
         final Set<ValidationError> errors = new HashSet<>();
+        ValidationValue validationValue = new ValidationValue();
 
         for (JsonNode input : inputsWithValidations) {
-            ValidationValue validationValue = new ValidationValue();
-
             final String id = input.get(COMPONENT_KEY).asText();
             final ArrayNode inspectedValue = dataContext.read("$.." + id, ArrayNode.class);
 
@@ -104,9 +102,9 @@ public class Validator {
     }
 
     private Set<ValidationError> validateFormGrid(
-            Object jsonataData,
-            ValidationValue validationValue,
-            ArrayNode inspectedValue) {
+            final Object jsonataData,
+            final ValidationValue validationValue,
+            final ArrayNode inspectedValue) {
         Set<ValidationError> errors = new HashSet<>();
 
         for (int row = 0; row < inspectedValue.size(); row++) {
@@ -122,9 +120,9 @@ public class Validator {
     }
 
     private Set<ValidationError> validateFormNormal(
-            Object jsonataData,
-            ValidationValue validationValue,
-            ArrayNode inspectedValue) {
+            final Object jsonataData,
+            final ValidationValue validationValue,
+            final ArrayNode inspectedValue) {
 
         Set<ValidationError> errors = new HashSet<>();
         validationValue.setValue(inspectedValue.get(0));

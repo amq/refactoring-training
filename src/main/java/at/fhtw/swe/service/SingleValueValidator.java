@@ -1,4 +1,4 @@
-package at.fhtw.swe.controller;
+package at.fhtw.swe.service;
 
 import at.fhtw.swe.model.ValidationError;
 import at.fhtw.swe.model.ValidationValue;
