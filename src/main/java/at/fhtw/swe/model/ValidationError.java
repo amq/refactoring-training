@@ -32,7 +32,7 @@ public class ValidationError {
         if (object == null || getClass() != object.getClass()) {
             return false;
         }
-        ValidationError that = (ValidationError) object;
+        final ValidationError that = (ValidationError) object;
         return Objects.equals(key, that.key) &&
                 Objects.equals(violation, that.violation);
     }
