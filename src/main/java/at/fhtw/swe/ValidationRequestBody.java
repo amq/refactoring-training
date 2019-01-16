@@ -1,4 +1,4 @@
-package at.fhtw.swe.model;
+package at.fhtw.swe;
 
 public class ValidationRequestBody {
     private String data;

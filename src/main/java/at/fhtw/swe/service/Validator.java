@@ -45,7 +45,7 @@ public class Validator {
 
     private final transient SingleValueValidator singleValueValidator = new SingleValueValidator();
 
-    public Validator(final JsonataEngine jsonataEngine) {
+    public Validator(JsonataEngine jsonataEngine) {
         this.jsonataEngine = jsonataEngine;
 
         Configuration.setDefaults(
